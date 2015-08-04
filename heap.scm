@@ -8,7 +8,7 @@
 
 ;; Returns #t when the heap is empty.
 (define (heap-empty? heap)
-  (= 0 (heap-size heap)))
+  (fx= 0 (heap-size heap)))
 
 ;; test for the heap null value
 (define (heap-null-value? v)
@@ -39,6 +39,11 @@
 			(loop pn))
 		   (#t heap))))))))
 
+;; Add element el only if el is true under `if`
+(define (heap-add-if! heap el)
+  (if el (heap-add! heap el))
+  heap)
+
 ;; Take the top of the heap off.
 ;; Returns a heap-null-value when the heap is empty.
 ;; to extract the values sorted by pred, pop the heap
@@ -48,13 +53,19 @@
 	  heap-null-value
 	  (let* ((return-value (heap-ref heap 0))
 			 (data (heap-data heap))
-			 (new-size (- (heap-size heap) 1))
+			 (new-size (fx- (heap-size heap) 1))
 			 (last-val (vector-ref data new-size)))
 		   (heap-size-set! heap new-size)
 		   (vector-set! data new-size heap-null-value)
 		   (vector-set! data 0 last-val)
 		   (heap-adjust! heap 0)
 		   return-value)))
+
+;; Return the object at the head of the heap without popping.
+(define (heap-peek heap)
+  (if (heap-empty? heap)
+	  heap-null-value
+	  (heap-ref heap 0)))
 
 ;; Implementation 
 
@@ -66,19 +77,27 @@
 ;; the heap type
 (define-type heap data size pred)
 
+(define (heap-empty-fast! heap)
+  (heap-size-set! heap 0)
+  (let* ((d (heap-data heap))
+		 (n (vector-length d))) 
+	(do ((i 0 (fx+ i 1)))
+		((fx= i n) heap)
+	  (vector-set! d i heap-null-value))))
+
 ;; double the current maximum size of the heap
 (define (heap-double-max-size heap)
   (let* ((old-data (heap-data heap))
 		 (n-items (heap-size heap))
-		 (new-data (make-vector (* 2 (vector-length old-data)) heap-null-value)))
+		 (new-data (make-vector (fx* 2 (vector-length old-data)) heap-null-value)))
 	(heap-data-set! heap
 	 new-data)
 	(let loop 
 		((i 0))
 	  (cond 
-	   ((< i n-items)
+	   ((fx< i n-items)
 		(vector-set! new-data i (vector-ref old-data i))
-		(loop (+ i 1)))
+		(loop (fx+ i 1)))
 	   (#t new-data)))
 	heap))
 
@@ -87,32 +106,32 @@
 (define (heap-expand-by-one heap val)
   (let* ((max-size (vector-length (heap-data heap)))
 		 (current-size (heap-size heap))
-		 (new-size (+ 1 current-size)))
+		 (new-size (fx+ 1 current-size)))
 	(if (> new-size max-size)
 		(begin 
 		  (heap-double-max-size heap)
 		  (heap-expand-by-one heap val))
 		(let ((old-size (heap-size heap)))
-		  (heap-size-set! heap (+ 1 old-size))
+		  (heap-size-set! heap (fx+ 1 old-size))
 		  (vector-set! (heap-data heap) old-size val)))))
 
 ;; give index of the left child of i
 (define (heap-left i)
-  (+ 1 (* 2 i)))
+  (fx+ 1 (fx* 2 i)))
 
 ;; give the index of the right child of i
 (define (heap-right i)
-  (+ 2 (* 2 i)))
+  (fx+ 2 (fx* 2 i)))
 
 ;; give the index of i's parent
 (define (heap-parent i)
   (cond 
-   ((odd? i) (quotient (- i 1) 2))
-   ((even? i) (quotient (- i 2) 2))))
+   ((odd? i) (quotient (fx- i 1) 2))
+   ((even? i) (quotient (fx- i 2) 2))))
 
 ;; Return #t when i is the root of the heap
 (define (heap-root? i)
-  (= i 0))
+  (fx= i 0))
 
 ;; Give the node value at N of the heap HEAP
 (define (heap-ref heap n)
@@ -170,5 +189,28 @@
 		  (vector-set! data m val)
 		  (heap-adjust! heap m)))
 	   (#t heap))))))
+
+;; Pop all the elements in the heap out into a list.
+(define (heap-empty->list! heap)
+  (let loop ((output '()))
+	(let ((val (heap-pop! heap)))
+	  (if (heap-null-value? val)
+		  (reverse output)
+		  (loop (cons val output))))))
+
+;; (define (heap-process->empty! f heap)
+;;   (let loop ((val (heap-pop! heap)))
+;; 	(if (not (heap-null-value? val))
+;; 		(begin (f val)
+;; 			   (loop (heap-pop! heap)))
+;; 		#t)))
+
+(define (heap-process->empty! f heap)
+  (let ((n (heap-size heap))) 
+	(do ((i 0 (fx+ i 1)))
+		((fx= i n) #t)
+	  (f (heap-pop! heap)))))
+
+
 
 
